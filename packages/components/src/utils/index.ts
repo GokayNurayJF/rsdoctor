@@ -14,3 +14,4 @@ export * from './time';
 export * from './url';
 export * from './worker';
 export * from './stats';
+export * from './window-api';

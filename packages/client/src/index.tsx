@@ -2,11 +2,14 @@ import '@rsdoctor/components/i18n';
 import App from './App';
 import ReactDOM from 'react-dom/client';
 import './common/styles/base.scss';
+import { initializeWindowAPI } from '@rsdoctor/components/utils';
 
 const rootElement = document.getElementById('root');
 const root = ReactDOM.createRoot(rootElement!);
 
 root.render(<App />);
+
+initializeWindowAPI();
 
 const link = document.createElement('link');
 link.setAttribute('type', 'image/x-icon');
