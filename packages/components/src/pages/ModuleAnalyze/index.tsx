@@ -45,6 +45,8 @@ export const ModuleAnalyzeComponent: React.FC<{
       body={{ moduleId: +moduleId }}
     >
       {({ module, dependencies }) => {
+        console.log('module', module);
+        console.log('dependencies', dependencies);
         return (
           <Drawer
             title={

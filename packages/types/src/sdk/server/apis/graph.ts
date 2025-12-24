@@ -1,5 +1,5 @@
 import { API } from './index';
-import { ModuleData, ModuleGraphData } from '../../module';
+import { ModuleData, ModuleGraphData, DependencyData } from '../../module';
 import { RsdoctorClientAssetsSummary } from '../../../client';
 import {
   AssetData,
@@ -17,7 +17,12 @@ export interface GraphAPIResponse {
   [API.GetChunksByModuleId]: ChunkData[];
   [API.GetModuleDetails]: {
     module: ModuleData;
-  } & Pick<ModuleGraphData, 'dependencies'>;
+    dependencies: DependencyData[];
+    allDependencies: ModuleData[];
+    boundDependencies: ModuleData[];
+    boundSize: string;
+    allDependenciesSize: string;
+  };
   [API.GetModulesByModuleIds]: ModuleData[];
   [API.GetEntryPoints]: EntryPointData[];
 }

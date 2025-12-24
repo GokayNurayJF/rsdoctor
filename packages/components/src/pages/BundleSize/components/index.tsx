@@ -344,6 +344,7 @@ export const WebpackModulesOverallBase: React.FC<
                       );
                     };
 
+                    console.log('data', data);
                     const computedTreeData: TreeNode[] = data
                       .filter((item) => isTargetFileType(item.asset.path))
                       .map((item) => ({

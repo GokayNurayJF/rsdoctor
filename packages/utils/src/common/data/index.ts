@@ -294,6 +294,40 @@ export class APIDataLoader {
 
       case SDK.ServerAPI.API.GetAllModuleGraph:
         return this.loader.loadData('moduleGraph').then((moduleGraph) => {
+          const { modules = [], dependencies = [] } = moduleGraph || {};
+          const moduleMap = new Map<number | string, SDK.ModuleData>();
+          modules.forEach((module) => {
+            moduleMap.set(module.id, module);
+          });
+          const dependencyMap = new Map<number | string, SDK.DependencyData>();
+          dependencies.forEach((dependency) => {
+            dependencyMap.set(dependency.id, dependency);
+          });
+          modules.forEach((module) => {
+            module.importedNames = module.imported.map(
+              (i) => moduleMap.get(i)?.path || '',
+            );
+            module.isChunkEntry = false;
+            const getPackageName = (path: string) => {
+              const modulePath = path.split('/');
+              return modulePath?.[
+                modulePath.findIndex((p) => p === 'packages') + 2
+              ];
+            };
+            const packageName = getPackageName(module?.path || '');
+            module.importedNames?.forEach((i) => {
+              const iPackageName = getPackageName(i);
+              if (iPackageName !== packageName) {
+                module.isChunkEntry = true;
+              }
+            });
+            module.dependenciesNames = [];
+            module.dependencies.forEach((i) => {
+              module.dependenciesNames?.push(
+                dependencyMap.get(i)?.request || '',
+              );
+            });
+          });
           return moduleGraph?.modules as R;
         });
 

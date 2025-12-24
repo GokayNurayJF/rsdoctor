@@ -117,15 +117,94 @@ export function filterModulesAndDependenciesByPackageDeps(
   };
 }
 
+const getAllDependencies = (
+  module: SDK.ModuleData,
+  moduleMap: Map<number, SDK.ModuleData>,
+  dependencyMap: Map<number, SDK.DependencyData>,
+  res: Set<number>,
+) => {
+  if (res.has(module.id)) {
+    return;
+  }
+  res.add(module.id);
+  if (module?.modules) {
+    module.modules.forEach((moduleId) => {
+      getAllDependencies(
+        moduleMap.get(moduleId)!,
+        moduleMap,
+        dependencyMap,
+        res,
+      );
+    });
+  }
+  module.dependencies.forEach((dependency) => {
+    const dep = dependencyMap.get(dependency);
+    if (dep) {
+      const targetModule = moduleMap.get(dep.originDependency);
+      if (targetModule) {
+        getAllDependencies(targetModule, moduleMap, dependencyMap, res);
+      }
+    }
+  });
+};
+
 export function getModuleDetails(
   moduleId: number,
   modules: SDK.ModuleData[],
   dependencies: SDK.DependencyData[],
 ): SDK.ServerAPI.InferResponseType<SDK.ServerAPI.API.GetModuleDetails> {
   const module = modules.find((e) => e.id === moduleId)!;
+  const directDependencies = getDependenciesByModule(module, dependencies);
+  const moduleMap = new Map<number, SDK.ModuleData>();
+  modules
+    .filter((m) => m.chunks.length || m.concatenationModules?.length || true)
+    .forEach((m) => {
+      moduleMap.set(m.id, m);
+    });
+  const dependencyMap = new Map<number, SDK.DependencyData>();
+  dependencies.forEach((d) => {
+    dependencyMap.set(d.id, d);
+  });
+
+  const allDependencies = new Set<number>();
+  getAllDependencies(module, moduleMap, dependencyMap, allDependencies);
+
+  let boundSize = 0;
+  const unBoundDependencies: Set<number> = new Set();
+  allDependencies.forEach((id) => {
+    if (id === module.id) {
+      return;
+    }
+    const mod = moduleMap.get(id);
+    const unbound = !mod?.imported
+      .filter((i) => moduleMap.has(i))
+      .every((i) => allDependencies.has(i));
+    if (unbound) {
+      getAllDependencies(mod!, moduleMap, dependencyMap, unBoundDependencies);
+    }
+  });
+  const boundDependencies = Array.from(allDependencies)
+    .filter((id) => !unBoundDependencies.has(id))
+    .map((id) => {
+      const mod = moduleMap.get(id);
+      if (mod) {
+        boundSize += mod.size.sourceSize;
+        return mod;
+      }
+      return undefined;
+    })
+    .filter(Boolean) as SDK.ModuleData[];
 
   return {
     module,
-    dependencies: getDependenciesByModule(module, dependencies),
+    dependencies: directDependencies,
+    allDependencies: Array.from(allDependencies).map(
+      (id) => moduleMap.get(id)!,
+    ),
+    boundDependencies,
+    boundSize: boundSize.toLocaleString(),
+    allDependenciesSize: Array.from(allDependencies)
+      .reduce((acc, id) => acc + (moduleMap.get(id)?.size.sourceSize ?? 0), 0)
+      .toLocaleString(),
   };
 }

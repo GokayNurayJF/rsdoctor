@@ -360,6 +360,9 @@ export interface ModuleData
 
   /** Identifier of the dependent module */
   imported: number[];
+  importedNames?: string[];
+  isChunkEntry?: boolean;
+  dependenciesNames?: string[];
 
   /** Is it an entrance module */
   isEntry?: boolean | undefined;

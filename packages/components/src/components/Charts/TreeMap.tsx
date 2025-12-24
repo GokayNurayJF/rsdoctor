@@ -39,6 +39,8 @@ type TreemapDataNode = NonNullable<TreemapSeriesOption['data']>[number] & {
   bundledSize?: number;
   gzipSize?: number;
   moduleId?: string | number;
+  imported?: string[];
+  dependencyNames?: string[];
 };
 
 echarts.use([TreemapChart, TooltipComponent, TitleComponent, CanvasRenderer]);
@@ -64,6 +66,7 @@ interface TreeMapProps {
   highlightNodeId?: number;
   centerNodeId?: number;
   rootPath?: string;
+  modules: SDK.ModuleData[];
 }
 
 function hashString(str: string): number {
@@ -140,11 +143,25 @@ const TreeMapInner: React.FC<
     highlightNodeId,
     centerNodeId,
     rootPath,
+    modules,
   }) => {
+    const moduleMap = useMemo(() => {
+      const map = new Map<number | string, SDK.ModuleData>();
+      modules.forEach((module) => {
+        map.set(module.id, module);
+      });
+      return map;
+    }, [modules]);
+
     const [option, setOption] = useState<TreeMapOption | null>(null);
     const chartRef = React.useRef<EChartsReactCore | null>(null);
     const chartDataRef = React.useRef<TreemapDataNode[]>([]);
     const clickTimeoutRef = React.useRef<number | null>(null);
+
+    useEffect(() => {
+      console.log('inner_data', treeData);
+      console.log('inner_modules', modules);
+    }, []);
 
     useEffect(() => {
       if (forwardedRef && chartRef.current) {
@@ -187,6 +204,11 @@ const TreeMapInner: React.FC<
           ),
         );
 
+        const module =
+          node.id !== undefined ? moduleMap.get(node.id) : undefined;
+        const importedModules = module?.importedNames || [];
+        const entry = module?.isChunkEntry || false;
+
         let val = 0;
         if (sizeType === 'stat') val = node.sourceSize || 0;
         else if (sizeType === 'parsed') val = node.bundledSize || 0;
@@ -201,7 +223,7 @@ const TreeMapInner: React.FC<
             ? node.path || node.name || ''
             : `${currentChunkPath}::${node.path || node.name || ''}`;
         const nodeId = hashString(nodeIdString);
-        const isHighlighted = highlightNodeId === nodeId;
+        const isHighlighted = highlightNodeId === nodeId || entry;
 
         const baseColorRatio =
           level === 0 ? 1 : Math.max(0.35, 1 - level * 0.15);
@@ -246,6 +268,8 @@ const TreeMapInner: React.FC<
             node.bundledSize ?? (sizeType === 'parsed' ? val : undefined),
           gzipSize: node.gzipSize ?? (sizeType === 'gzip' ? val : undefined),
           moduleId: node.id,
+          imported: importedModules,
+          dependencyNames: module?.dependenciesNames || [],
           itemStyle: {
             borderWidth: isHighlighted ? 4 : 1,
             color: nodeColor,
@@ -367,6 +391,7 @@ const TreeMapInner: React.FC<
               typeof node.gzipSize === 'number' && node.gzipSize > 0
                 ? node.gzipSize
                 : undefined;
+            const moduleId = node.moduleId;
 
             function makeRow(label: string, value: string, color: string) {
               return `<div class="${Styles['tooltip-row']}">
@@ -391,6 +416,38 @@ const TreeMapInner: React.FC<
                 makeRow('Gzipped size', formatSize(gzipSize), '#1677ff'),
               );
             }
+            if (moduleId !== undefined) {
+              rows.push(
+                '<span id="bound-size">Bound size: loading</span> <br> <span id="all-dependencies-size">All dependencies size: loading</span>',
+              );
+              window
+                .getModuleDetails({ moduleId: moduleId })
+                .then(
+                  (
+                    details: SDK.ServerAPI.InferResponseType<SDK.ServerAPI.API.GetModuleDetails>,
+                  ) => {
+                    if (document.getElementById('bound-size')) {
+                      document.getElementById('bound-size')!.innerHTML =
+                        `Bound size: ${details.boundSize}`;
+                    }
+                    if (document.getElementById('all-dependencies-size')) {
+                      document.getElementById(
+                        'all-dependencies-size',
+                      )!.innerHTML =
+                        `All dependencies size: ${details.allDependenciesSize}`;
+                    }
+                  },
+                );
+            }
+            if (moduleId !== undefined) {
+              rows.push(makeRow('Module ID', String(moduleId), '#1677ff'));
+            }
+            node.imported?.forEach((i) => {
+              rows.push(makeRow('Imported by: ', i, '#1677ff'));
+            });
+            node.dependencyNames?.forEach((i) => {
+              rows.push(makeRow('Dependencies: ', i, '#1677ff'));
+            });
 
             return `
                 <div style="font-family: sans-serif; font-size: 12px; line-height: 1.5;">
@@ -464,7 +521,7 @@ const TreeMapInner: React.FC<
           } as TreemapSeriesOption,
         ],
       });
-    }, [treeData, sizeType, highlightNodeId, rootPath]);
+    }, [treeData, sizeType, highlightNodeId, rootPath, moduleMap]);
 
     useEffect(() => {
       if (centerNodeId && chartRef.current && option) {
@@ -567,6 +624,10 @@ const TreeMapInner: React.FC<
       };
     }, []);
 
+    useEffect(() => {
+      console.log('option', option);
+    }, [option]);
+
     return option ? (
       <div className={Styles['chart-container']} style={style}>
         <Alert
@@ -632,12 +693,20 @@ export const AssetTreemapWithFilter: React.FC<{
     <ServerAPIProvider api={SDK.ServerAPI.API.GetProjectInfo}>
       {(projectInfo) => {
         return (
-          <AssetTreemapWithFilterInner
-            treeData={treeData}
-            onChartClick={onChartClick}
-            bundledSize={bundledSize}
-            rootPath={projectInfo.root}
-          />
+          <ServerAPIProvider
+            api={SDK.ServerAPI.API.GetAllModuleGraph}
+            body={{}}
+          >
+            {(modules) => (
+              <AssetTreemapWithFilterInner
+                treeData={treeData}
+                onChartClick={onChartClick}
+                bundledSize={bundledSize}
+                rootPath={projectInfo.root}
+                modules={modules}
+              />
+            )}
+          </ServerAPIProvider>
         );
       }}
     </ServerAPIProvider>
@@ -649,7 +718,16 @@ const AssetTreemapWithFilterInner: React.FC<{
   onChartClick?: (params: ECElementEvent) => void;
   bundledSize?: boolean;
   rootPath: string;
-}> = ({ treeData, onChartClick, bundledSize = true, rootPath }) => {
+  modules: SDK.ModuleData[];
+}> = ({ treeData, onChartClick, bundledSize = true, rootPath, modules }) => {
+  const moduleMap = useMemo(() => {
+    const map = new Map<number | string, SDK.ModuleData>();
+    modules.forEach((module) => {
+      map.set(module.id, module);
+    });
+    return map;
+  }, [modules]);
+
   const assetNames = useMemo(
     () => treeData.map((item) => item.name),
     [treeData],
@@ -667,6 +745,7 @@ const AssetTreemapWithFilterInner: React.FC<{
   const [moduleId, setModuleId] = useState<string | number>('');
   const [showAnalyze, setShowAnalyze] = useState(false);
   const [chunkSearchQuery, setChunkSearchQuery] = useState('');
+  const [importedSearchQuery, setImportedSearchQuery] = useState('');
 
   const chartRef = React.useRef<EChartsReactCore>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -759,8 +838,73 @@ const AssetTreemapWithFilterInner: React.FC<{
       );
     }
 
+    //TODO: optimize this
+    if (importedSearchQuery.trim()) {
+      const queryLower = importedSearchQuery.toLowerCase();
+
+      const matchingModulePaths = new Set<string>();
+      modules.forEach((module) => {
+        if (module.path && module.path.toLowerCase().includes(queryLower)) {
+          matchingModulePaths.add(module.path.toLowerCase());
+        }
+      });
+
+      const filterNode = (node: TreeNode): TreeNode | null => {
+        const module =
+          node.id !== undefined ? moduleMap.get(node.id) : undefined;
+        const hasMatchingImport = module?.importedNames?.some(
+          (importedName) => {
+            const importedNameLower = importedName.toLowerCase();
+            return Array.from(matchingModulePaths).some((matchingPath) => {
+              return (
+                matchingPath.includes(importedNameLower) ||
+                importedNameLower.includes(matchingPath) ||
+                matchingPath === importedNameLower
+              );
+            });
+          },
+        );
+
+        if (hasMatchingImport) {
+          const filteredChildren = node.children
+            ? node.children
+                .map(filterNode)
+                .filter((child): child is TreeNode => child !== null)
+            : undefined;
+          return {
+            ...node,
+            children: filteredChildren,
+          };
+        }
+
+        if (node.children) {
+          const filteredChildren = node.children
+            .map(filterNode)
+            .filter((child): child is TreeNode => child !== null);
+          if (filteredChildren.length > 0) {
+            return {
+              ...node,
+              children: filteredChildren,
+            };
+          }
+        }
+
+        return null;
+      };
+
+      filtered = filtered
+        .map(filterNode)
+        .filter((item): item is TreeNode => item !== null);
+    }
+
     return filtered;
-  }, [treeData, checkedAssets, chunkSearchQuery]);
+  }, [
+    treeData,
+    checkedAssets,
+    chunkSearchQuery,
+    importedSearchQuery,
+    moduleMap,
+  ]);
 
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
@@ -986,6 +1130,24 @@ const AssetTreemapWithFilterInner: React.FC<{
               </div>
             )}
           </div>
+
+          <div>
+            <h4>Filter by imported modules</h4>
+            <Input
+              placeholder="Search by imported module path"
+              value={importedSearchQuery}
+              onChange={(e) => setImportedSearchQuery(e.target.value)}
+              suffix={<SearchOutlined style={{ color: '#ccc' }} />}
+              allowClear
+              size="small"
+            />
+            {importedSearchQuery.trim() && (
+              <div style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
+                Showing modules that import from modules matching "
+                {importedSearchQuery}"
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -999,22 +1161,16 @@ const AssetTreemapWithFilterInner: React.FC<{
           centerNodeId={centerNodeId}
           rootPath={rootPath}
           style={{ width: '100%', height: '100%' }}
+          modules={modules}
         />
         {moduleId ? (
-          <ServerAPIProvider
-            api={SDK.ServerAPI.API.GetAllModuleGraph}
-            body={{}}
-          >
-            {(modules) => (
-              <ModuleAnalyzeComponent
-                cwd={rootPath}
-                moduleId={moduleId}
-                modules={modules}
-                show={showAnalyze}
-                setShow={setShowAnalyze}
-              />
-            )}
-          </ServerAPIProvider>
+          <ModuleAnalyzeComponent
+            cwd={rootPath}
+            moduleId={moduleId}
+            modules={modules}
+            show={showAnalyze}
+            setShow={setShowAnalyze}
+          />
         ) : null}
       </div>
     </div>
