@@ -68,10 +68,7 @@ name: Bundle Analysis
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
-  push:
-    branches:
-      - main # or your target branch name
+    types: [opened, synchronize, reopened, closed]
 
 jobs:
   bundle-analysis:

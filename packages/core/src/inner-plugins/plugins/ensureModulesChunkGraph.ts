@@ -73,34 +73,24 @@ export const ensureModulesChunksGraphFn = (
     },
   );
 
-  // Hook: Process assets to collect source maps (Rspack only)
-  compiler.hooks.compilation.tap(
+  // Hook: After assets are emitted, collect source maps (Rspack only)
+  compiler.hooks.afterEmit.tapPromise(
     {
       ...pluginTapPostOptions,
-      name: 'RsdoctorSourceMapCollector',
+      stage: pluginTapPostOptions.stage! + 100,
     },
-    (compilation: Plugin.BaseCompilation) => {
-      if (compilation.hooks.processAssets) {
-        compilation.hooks.processAssets.tapPromise(
-          {
-            name: 'RsdoctorSourceMapCollector',
-            stage: 2500 - 100, // Compilation.PROCESS_ASSETS_STAGE_OPTIMIZE_HASH
-          },
-          async () => {
-            if (!ensureDevtools(compiler)) {
-              return;
-            }
-            const { namespace, sourceMapFilenameRegex } =
-              calculateNamespaceAndRegex(compiler);
-            await handleAfterEmitAssets(
-              compilation,
-              _this,
-              sourceMapFilenameRegex,
-              namespace,
-            );
-          },
-        );
+    async (compilation) => {
+      if (!ensureDevtools(compiler)) {
+        return;
       }
+      const { namespace, sourceMapFilenameRegex } =
+        calculateNamespaceAndRegex(compiler);
+      await handleAfterEmitAssets(
+        compilation,
+        _this,
+        sourceMapFilenameRegex,
+        namespace,
+      );
     },
   );
 
