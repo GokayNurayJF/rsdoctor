@@ -759,7 +759,7 @@ const AssetTreemapWithFilterInner: React.FC<{
   bundledSize?: boolean;
   rootPath: string;
   modules: SDK.ModuleData[];
-}> = ({ treeData, onChartClick, bundledSize = true, rootPath, modules }) => {
+}> = ({ treeData, onChartClick, rootPath, modules }) => {
   const moduleMap = useMemo(() => {
     const map = new Map<number | string, SDK.ModuleData>();
     modules.forEach((module) => {
@@ -775,9 +775,7 @@ const AssetTreemapWithFilterInner: React.FC<{
 
   const [checkedAssets, setCheckedAssets] = useState<string[]>(assetNames);
   const [collapsed, setCollapsed] = useState(false);
-  const [sizeType, setSizeType] = useState<SizeType>(
-    bundledSize ? 'parsed' : 'stat',
-  );
+  const [sizeType, setSizeType] = useState<SizeType>('stat');
   const [searchQuery, setSearchQuery] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [highlightNodeId, setHighlightNodeId] = useState<number | undefined>();
@@ -882,27 +880,18 @@ const AssetTreemapWithFilterInner: React.FC<{
     if (importedSearchQuery.trim()) {
       const queryLower = importedSearchQuery.toLowerCase();
 
-      const matchingModulePaths = new Set<string>();
+      const matchingModulePaths = new Set<number>();
       modules.forEach((module) => {
         if (module.path && module.path.toLowerCase().includes(queryLower)) {
-          matchingModulePaths.add(module.path.toLowerCase());
+          matchingModulePaths.add(module.id);
         }
       });
 
       const filterNode = (node: TreeNode): TreeNode | null => {
         const module =
           node.id !== undefined ? moduleMap.get(node.id) : undefined;
-        const hasMatchingImport = module?.importedNames?.some(
-          (importedName) => {
-            const importedNameLower = importedName.toLowerCase();
-            return Array.from(matchingModulePaths).some((matchingPath) => {
-              return (
-                matchingPath.includes(importedNameLower) ||
-                importedNameLower.includes(matchingPath) ||
-                matchingPath === importedNameLower
-              );
-            });
-          },
+        const hasMatchingImport = module?.imported?.some((importedId) =>
+          matchingModulePaths.has(importedId),
         );
 
         if (hasMatchingImport) {
@@ -1172,7 +1161,7 @@ const AssetTreemapWithFilterInner: React.FC<{
           </div>
 
           <div>
-            <h4>Filter by imported modules</h4>
+            <h4>Filter by imported by modules</h4>
             <Input
               placeholder="Search by imported module path"
               value={importedSearchQuery}
@@ -1183,8 +1172,8 @@ const AssetTreemapWithFilterInner: React.FC<{
             />
             {importedSearchQuery.trim() && (
               <div style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
-                Showing modules that import from modules matching "
-                {importedSearchQuery}"
+                Showing modules that are imported by modules with paths
+                including "{importedSearchQuery}"
               </div>
             )}
           </div>
