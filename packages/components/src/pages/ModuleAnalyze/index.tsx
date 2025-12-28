@@ -16,6 +16,7 @@ import {
 export enum TabList {
   Reasons,
   Dependencies,
+  BoundModules,
 }
 
 const tabslist = [
@@ -26,6 +27,10 @@ const tabslist = [
   {
     key: TabList[TabList.Dependencies],
     label: TabList[TabList.Dependencies],
+  },
+  {
+    key: TabList[TabList.BoundModules],
+    label: 'All Dependencies',
   },
 ] as unknown as { key: string; label: string }[];
 
@@ -44,7 +49,13 @@ export const ModuleAnalyzeComponent: React.FC<{
       api={SDK.ServerAPI.API.GetModuleDetails}
       body={{ moduleId: +moduleId }}
     >
-      {({ module, dependencies }) => {
+      {({
+        module,
+        dependencies,
+        boundDependencies,
+        boundSize,
+        allDependencies,
+      }) => {
         console.log('module', module);
         console.log('dependencies', dependencies);
         return (
@@ -134,6 +145,9 @@ export const ModuleAnalyzeComponent: React.FC<{
                               curModule={module}
                               modules={modules}
                               dependencies={dependencies}
+                              boundDependencies={boundDependencies}
+                              allDependencies={allDependencies}
+                              boundSize={boundSize}
                               cwd={cwd}
                               selectedChunk={selectedChunk}
                               activeTabKey={activeTabKey}

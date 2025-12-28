@@ -5,6 +5,7 @@ import { Size } from 'src/constants';
 import { FileTree } from './components/fileTreeCom';
 import { clsNamePrefix } from './constants';
 import DependencyTree from './dependency';
+import BoundModulesTree from './allDependencies';
 import { getImporteds } from './utils';
 import { useCreateFileTreeData } from './utils/hooks';
 import { TabList } from './index';
@@ -59,6 +60,9 @@ export const ModuleFilesTree: React.FC<{
   modules: SDK.ModuleData[];
   dependencies: SDK.DependencyData[];
   curModule: SDK.ModuleData;
+  boundDependencies?: SDK.ModuleData[];
+  allDependencies?: SDK.ModuleData[];
+  boundSize?: string;
   cwd: string;
   selectedChunk: string;
   activeTabKey: string;
@@ -67,6 +71,9 @@ export const ModuleFilesTree: React.FC<{
     curModule,
     modules,
     dependencies,
+    boundDependencies,
+    allDependencies,
+    boundSize,
     cwd,
     activeTabKey,
     selectedChunk = '',
@@ -103,6 +110,20 @@ export const ModuleFilesTree: React.FC<{
       );
     }
 
+    if (activeTabKey === TabList[TabList.BoundModules]) {
+      return (boundDependencies && boundDependencies.length > 0) ||
+        (allDependencies && allDependencies.length > 0) ? (
+        <BoundModulesTree
+          boundModules={boundDependencies || []}
+          allModules={allDependencies || []}
+          boundSize={boundSize || '0'}
+          cwd={cwd}
+        />
+      ) : (
+        <Empty className={`${clsNamePrefix}-empty`} />
+      );
+    }
+
     return (
       <div
         className={`${clsNamePrefix}-file-tree`}
@@ -125,6 +146,9 @@ export const ModuleFilesTree: React.FC<{
     activeTabKey,
     curModule,
     dependencies,
+    boundDependencies,
+    allDependencies,
+    boundSize,
     fileStructures,
     importedModules,
     cwd,
