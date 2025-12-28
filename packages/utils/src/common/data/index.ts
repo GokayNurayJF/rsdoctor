@@ -249,6 +249,17 @@ export class APIDataLoader {
           const { modules = [], dependencies = [] } = res[1] || {};
           return Graph.getModuleDetails(moduleId, modules, dependencies) as R;
         });
+      case SDK.ServerAPI.API.GetBoundSizeByModuleIds:
+        return this.loader.loadData('moduleGraph').then((res) => {
+          const { moduleIds } =
+            body as SDK.ServerAPI.InferRequestBodyType<SDK.ServerAPI.API.GetBoundSizeByModuleIds>;
+          const { modules = [], dependencies = [] } = res || {};
+          return Graph.getBoundSizeByModuleIds(
+            moduleIds,
+            modules,
+            dependencies,
+          ) as R;
+        });
       case SDK.ServerAPI.API.GetModulesByModuleIds:
         return this.loader.loadData('moduleGraph').then((res) => {
           const { moduleIds } =

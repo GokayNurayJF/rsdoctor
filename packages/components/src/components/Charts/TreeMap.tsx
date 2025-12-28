@@ -41,6 +41,7 @@ type TreemapDataNode = NonNullable<TreemapSeriesOption['data']>[number] & {
   moduleId?: string | number;
   imported?: string[];
   dependencyNames?: string[];
+  children?: TreemapDataNode[];
 };
 
 echarts.use([TreemapChart, TooltipComponent, TitleComponent, CanvasRenderer]);
@@ -327,6 +328,7 @@ const TreeMapInner: React.FC<
             (item.children && item.children.length > 0),
         );
 
+      console.log('finaldata', data);
       chartDataRef.current = data;
 
       setOption({
@@ -416,15 +418,53 @@ const TreeMapInner: React.FC<
                 makeRow('Gzipped size', formatSize(gzipSize), '#1677ff'),
               );
             }
+            rows.push(
+              '<span id="bound-size">Bound size: loading</span> <br> <span id="all-dependencies-size">All dependencies size: loading</span>',
+            );
             if (moduleId !== undefined) {
-              rows.push(
-                '<span id="bound-size">Bound size: loading</span> <br> <span id="all-dependencies-size">All dependencies size: loading</span>',
-              );
               window
                 .getModuleDetails({ moduleId: moduleId })
                 .then(
                   (
                     details: SDK.ServerAPI.InferResponseType<SDK.ServerAPI.API.GetModuleDetails>,
+                  ) => {
+                    if (document.getElementById('bound-size')) {
+                      document.getElementById('bound-size')!.innerHTML =
+                        `Bound size: ${details.boundSize}`;
+                    }
+                    if (document.getElementById('all-dependencies-size')) {
+                      document.getElementById(
+                        'all-dependencies-size',
+                      )!.innerHTML =
+                        `All dependencies size: ${details.allDependenciesSize}`;
+                    }
+                  },
+                );
+            } else {
+              const childrenModules: (number | string)[] = [];
+              const getChildrenModules = (node: TreemapDataNode) => {
+                if (node.children) {
+                  node.children.forEach((child: TreemapDataNode) => {
+                    if (child.moduleId) {
+                      childrenModules.push(child.moduleId);
+                    }
+                    getChildrenModules(child);
+                  });
+                }
+              };
+              getChildrenModules(node);
+              rows.push(
+                makeRow(
+                  'Module count',
+                  childrenModules.length.toString(),
+                  '#1677ff',
+                ),
+              );
+              window
+                .getBoundSizeByModuleIds({ moduleIds: childrenModules })
+                .then(
+                  (
+                    details: SDK.ServerAPI.InferResponseType<SDK.ServerAPI.API.GetBoundSizeByModuleIds>,
                   ) => {
                     if (document.getElementById('bound-size')) {
                       document.getElementById('bound-size')!.innerHTML =

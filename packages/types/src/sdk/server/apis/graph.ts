@@ -23,6 +23,12 @@ export interface GraphAPIResponse {
     boundSize: string;
     allDependenciesSize: string;
   };
+  [API.GetBoundSizeByModuleIds]: {
+    boundSize: string;
+    allDependenciesSize: string;
+    boundDependencies: ModuleData[];
+    allDependencies: ModuleData[];
+  };
   [API.GetModulesByModuleIds]: ModuleData[];
   [API.GetEntryPoints]: EntryPointData[];
 }
@@ -39,6 +45,9 @@ export interface GraphAPIRequestBody {
   };
   [API.GetModuleDetails]: {
     moduleId: number;
+  };
+  [API.GetBoundSizeByModuleIds]: {
+    moduleIds: number[];
   };
   [API.GetModulesByModuleIds]: {
     moduleIds: number[];

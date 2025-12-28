@@ -208,3 +208,64 @@ export function getModuleDetails(
       .toLocaleString(),
   };
 }
+
+export function getBoundSizeByModuleIds(
+  moduleIds: number[],
+  modules: SDK.ModuleData[],
+  dependencies: SDK.DependencyData[],
+): SDK.ServerAPI.InferResponseType<SDK.ServerAPI.API.GetBoundSizeByModuleIds> {
+  const moduleMap = new Map<number, SDK.ModuleData>();
+  modules.forEach((m) => {
+    moduleMap.set(m.id, m);
+  });
+  const dependencyMap = new Map<number, SDK.DependencyData>();
+  dependencies.forEach((d) => {
+    dependencyMap.set(d.id, d);
+  });
+  const allDependencies = new Set<number>();
+  moduleIds.forEach((id) => {
+    getAllDependencies(
+      moduleMap.get(id)!,
+      moduleMap,
+      dependencyMap,
+      allDependencies,
+    );
+  });
+
+  let boundSize = 0;
+  const unBoundDependencies: Set<number> = new Set();
+  allDependencies.forEach((id) => {
+    if (moduleIds.includes(id)) {
+      return;
+    }
+    const mod = moduleMap.get(id);
+    const unbound = !mod?.imported
+      .filter((i) => moduleMap.has(i))
+      .every((i) => allDependencies.has(i));
+    if (unbound) {
+      getAllDependencies(mod!, moduleMap, dependencyMap, unBoundDependencies);
+    }
+  });
+  const boundDependencies = Array.from(allDependencies)
+    .filter((id) => !unBoundDependencies.has(id))
+    .map((id) => {
+      const mod = moduleMap.get(id);
+      if (mod) {
+        boundSize += mod.size.sourceSize;
+        return mod;
+      }
+      return undefined;
+    })
+    .filter(Boolean) as SDK.ModuleData[];
+
+  return {
+    allDependencies: Array.from(allDependencies).map(
+      (id) => moduleMap.get(id)!,
+    ),
+    boundDependencies,
+    boundSize: boundSize.toLocaleString(),
+    allDependenciesSize: Array.from(allDependencies)
+      .reduce((acc, id) => acc + (moduleMap.get(id)?.size.sourceSize ?? 0), 0)
+      .toLocaleString(),
+  };
+}

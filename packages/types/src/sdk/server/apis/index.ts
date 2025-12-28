@@ -59,6 +59,7 @@ export enum API {
   GetAssetDetails = '/api/graph/asset/details',
   GetChunksByModuleId = '/api/graph/chunk/module',
   GetModuleDetails = '/api/graph/module/details',
+  GetBoundSizeByModuleIds = '/api/graph/modules/bound_size',
   GetModulesByModuleIds = '/api/graph/modules/ids',
   GetEntryPoints = '/api/graph/entrypoints',
   GetModuleCodeByModuleId = '/api/graph/module/code',
