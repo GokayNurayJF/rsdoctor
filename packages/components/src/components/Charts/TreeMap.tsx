@@ -505,6 +505,14 @@ const TreeMapInner: React.FC<
             }
             if (moduleId !== undefined) {
               rows.push(makeRow('Module ID', String(moduleId), '#111111'));
+            } else {
+              const index = node.children?.find((child) =>
+                child.name?.toString().startsWith('index.'),
+              ) as TreemapDataNode;
+              if (index) {
+                node.moduleId = index.moduleId;
+                node.imported = index.imported;
+              }
             }
             node.imported?.forEach((i) => {
               let processed = i;
