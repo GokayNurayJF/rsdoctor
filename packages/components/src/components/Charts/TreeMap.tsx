@@ -395,10 +395,16 @@ const TreeMapInner: React.FC<
                 : undefined;
             const moduleId = node.moduleId;
 
-            function makeRow(label: string, value: string, color: string) {
+            function makeRow(
+              label: string,
+              value: string,
+              color: string,
+              valueId?: string,
+            ) {
+              const valueIdAttr = valueId ? ` id="${valueId}"` : '';
               return `<div class="${Styles['tooltip-row']}">
                     <span class="${Styles['tooltip-label']}" style="color: ${color};">${label}</span>
-                    <span style="color: ${color};">${value}</span>
+                    <span${valueIdAttr} style="color: ${color};">${value}</span>
                 </div>`;
             }
 
@@ -419,7 +425,15 @@ const TreeMapInner: React.FC<
               );
             }
             rows.push(
-              '<span id="bound-size">Bound size: loading</span> <br> <span id="all-dependencies-size">All dependencies size: loading</span>',
+              makeRow('Bound size', 'loading...', '#722ed1', 'bound-size'),
+            );
+            rows.push(
+              makeRow(
+                'All dependencies size',
+                'loading...',
+                '#eb2f96',
+                'all-dependencies-size',
+              ),
             );
             if (moduleId !== undefined) {
               window
@@ -428,15 +442,20 @@ const TreeMapInner: React.FC<
                   (
                     details: SDK.ServerAPI.InferResponseType<SDK.ServerAPI.API.GetModuleDetails>,
                   ) => {
-                    if (document.getElementById('bound-size')) {
-                      document.getElementById('bound-size')!.innerHTML =
-                        `Bound size: ${details.boundSize}`;
+                    const boundSizeElement =
+                      document.getElementById('bound-size');
+                    const allDepsSizeElement = document.getElementById(
+                      'all-dependencies-size',
+                    );
+                    if (boundSizeElement) {
+                      boundSizeElement.innerHTML = formatSize(
+                        Number(details.boundSize.replace(/,/g, '')),
+                      );
                     }
-                    if (document.getElementById('all-dependencies-size')) {
-                      document.getElementById(
-                        'all-dependencies-size',
-                      )!.innerHTML =
-                        `All dependencies size: ${details.allDependenciesSize}`;
+                    if (allDepsSizeElement) {
+                      allDepsSizeElement.innerHTML = formatSize(
+                        Number(details.allDependenciesSize.replace(/,/g, '')),
+                      );
                     }
                   },
                 );
@@ -457,7 +476,7 @@ const TreeMapInner: React.FC<
                 makeRow(
                   'Module count',
                   childrenModules.length.toString(),
-                  '#1677ff',
+                  '#111111',
                 ),
               );
               window
@@ -466,24 +485,39 @@ const TreeMapInner: React.FC<
                   (
                     details: SDK.ServerAPI.InferResponseType<SDK.ServerAPI.API.GetBoundSizeByModuleIds>,
                   ) => {
-                    if (document.getElementById('bound-size')) {
-                      document.getElementById('bound-size')!.innerHTML =
-                        `Bound size: ${details.boundSize}`;
+                    const boundSizeElement =
+                      document.getElementById('bound-size');
+                    const allDepsSizeElement = document.getElementById(
+                      'all-dependencies-size',
+                    );
+                    if (boundSizeElement) {
+                      boundSizeElement.innerHTML = formatSize(
+                        Number(details.boundSize.replace(/,/g, '')),
+                      );
                     }
-                    if (document.getElementById('all-dependencies-size')) {
-                      document.getElementById(
-                        'all-dependencies-size',
-                      )!.innerHTML =
-                        `All dependencies size: ${details.allDependenciesSize}`;
+                    if (allDepsSizeElement) {
+                      allDepsSizeElement.innerHTML = formatSize(
+                        Number(details.allDependenciesSize.replace(/,/g, '')),
+                      );
                     }
                   },
                 );
             }
             if (moduleId !== undefined) {
-              rows.push(makeRow('Module ID', String(moduleId), '#1677ff'));
+              rows.push(makeRow('Module ID', String(moduleId), '#111111'));
             }
             node.imported?.forEach((i) => {
-              rows.push(makeRow('Imported by: ', i, '#1677ff'));
+              let processed = i;
+              if (i.includes('node_modules')) {
+                processed = i.substring(
+                  i.indexOf('node_modules') + 'node_modules'.length,
+                );
+              } else if (i.includes('packages')) {
+                processed = i.substring(
+                  i.indexOf('packages') + 'packages'.length,
+                );
+              }
+              rows.push(makeRow('Imported by: ', processed, '#ff7875'));
             });
             node.dependencyNames?.forEach((i) => {
               rows.push(makeRow('Dependencies: ', i, '#1677ff'));
